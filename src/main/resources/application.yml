@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: TaxRateSystemBackend
+
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+  address: 0.0.0.0
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:900000}
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  otp:
+    expiration-minutes: ${OTP_EXPIRATION_MINUTES:5}
+    length: ${OTP_LENGTH:6}
+  password-reset:
+    expiration-minutes: ${PASSWORD_RESET_EXPIRATION_MINUTES:15}
+
+logging:
+  level:
+    root: INFO
+    com.taxratesystem: INFO

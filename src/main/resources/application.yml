@@ -16,9 +16,15 @@ jwt:
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  mail:
+    # When false, e-mails (including OTP codes) are logged instead of sent.
+    # Intended for local development only - never disable in production.
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:}
   otp:
     expiration-minutes: ${OTP_EXPIRATION_MINUTES:5}
     length: ${OTP_LENGTH:6}
+    resend-cooldown-seconds: ${OTP_RESEND_COOLDOWN_SECONDS:45}
   password-reset:
     expiration-minutes: ${PASSWORD_RESET_EXPIRATION_MINUTES:15}
 

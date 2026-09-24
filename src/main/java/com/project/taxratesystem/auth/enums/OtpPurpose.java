@@ -1,4 +1,10 @@
 package com.project.taxratesystem.auth.enums;
 
-public class OtpPurpose {
+/**
+ * What an e-mailed one-time code is for (API.md §6.1, §6.3, §6.7).
+ */
+public enum OtpPurpose {
+    REGISTRATION,
+    PASSWORD_RESET
 }
+

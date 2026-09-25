@@ -1,0 +1,94 @@
+### TaxRateSystem - auth smoke tests (API.md §6, §17 Flows 1-2)
+### The OTP codes arrive by e-mail; with MAIL_ENABLED=false they are written to the application log.
+### Run the requests top to bottom: login/refresh/reset-verify capture the tokens the flow needs.
+
+@baseUrl = http://localhost:8080/api/v1
+@email = juan.delacruz@example.com
+@password = SecurePassword123
+
+### §6.1 - register (201; the 6-digit verification code arrives by e-mail)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Juan",
+  "lastName": "Dela Cruz",
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "phoneNumber": "09171234567",
+  "address": {
+    "street": "123 Rizal Avenue",
+    "barangay": "Barangay 1",
+    "city": "Manila",
+    "province": "Metro Manila",
+    "postalCode": "1000"
+  }
+}
+
+### §6.2 - activate the account with the e-mailed code (200, status ACTIVE)
+POST {{baseUrl}}/auth/verify-registration
+Content-Type: application/json
+
+{ "email": "{{email}}", "code": "482913" }
+
+### §6.3 - resend a code (200; identical answer whether or not the address exists)
+POST {{baseUrl}}/auth/resend-otp
+Content-Type: application/json
+
+{ "email": "{{email}}", "purpose": "REGISTRATION" }
+
+### §6.4 - login (200 with tokens; captures them for the later requests)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+> {%
+    client.global.set("accessToken", response.body.accessToken);
+    client.global.set("refreshToken", response.body.refreshToken);
+%}
+
+### §6.5 - refresh: rotates the token and issues a new pair
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refreshToken}}" }
+
+> {%
+    client.global.set("accessToken", response.body.accessToken);
+    client.global.set("refreshToken", response.body.refreshToken);
+%}
+
+### §6.6 - logout (204). Access tokens stay valid until they expire; delete the stored pair.
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "refreshToken": "{{refreshToken}}", "allDevices": false }
+
+### §6.7 - password reset: request a code (200, same response for unknown addresses)
+POST {{baseUrl}}/auth/password-reset/request
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+### §6.8 - exchange the code for a single-use reset token (200, captures it)
+POST {{baseUrl}}/auth/password-reset/verify
+Content-Type: application/json
+
+{ "email": "{{email}}", "code": "482913" }
+
+> {%
+    client.global.set("resetToken", response.body.resetToken);
+%}
+
+### §6.9 - set the new password (200; every session of the account is revoked)
+POST {{baseUrl}}/auth/password-reset/confirm
+Content-Type: application/json
+
+{
+  "resetToken": "{{resetToken}}",
+  "newPassword": "SecurePassword456",
+  "confirmPassword": "SecurePassword456"
+}
+

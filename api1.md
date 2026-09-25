@@ -262,6 +262,10 @@ This preserves the existing UI while swapping the backend implementation behind 
 
 > **Contract status — read first.** This file is the **intended** API contract for the TaxRateSystem backend, and it is the single source of truth for the HTTP interface between the Spring Boot backend and the Flutter client. As of 2026-09-23 the repository contains **structure only**: `AuthController`, `TaxController`, `CalculationController`, `UserController`, their services, every DTO, every entity except `User#id`, and all four Flyway migrations are empty placeholders (the `.sql` files are 0 bytes). **Every endpoint in this file is therefore marked `Implementation status: NOT IMPLEMENTED`**, and §21 is the authoritative gap report with evidence. Nothing here describes running behaviour today.
 >
+> **(Update 2026-09-25:** the implementation has since landed — all 24 routes of the §12 matrix now
+> exist and §21.1 has been flipped to *Complete*. See §22; the per-endpoint banners in this file
+> still show the 2026-09-23 baseline.)**
+>
 > Two rules were followed while writing it:
 > * **Nothing is silently invented.** Paths and schemas are the *project contract*: they were derived from the scaffolded class names (`RegisterRequest`, `PasswordResetVerifyRequest`, `TaxBracketResponse`, ...), the real configuration files (`application*.yml`, `build.gradle`, `.env`), and the Flutter client that has to consume them (`../taxratesystem_mobile`). Where neither exists, the decision is called out in §21 instead of being presented as fact.
 > * **Configuration is quoted, not invented.** Ports, token lifetimes, OTP rules and mail settings come from real files and are marked as such.
@@ -355,6 +359,9 @@ Notes:
 | `sub` | user e-mail (the login identifier) |
 | `uid` | numeric user id |
 | `iat` / `exp` | issued-at / expiry, epoch seconds |
+| `sid` | the refresh-token rotation family of the session that obtained the token; nullable, added 2026-09-25 (§22) so `PUT /users/me/password` can keep the caller signed in while signing every other session out (§7.4) |
+
+The implementation also emits `iss` and `typ`; clients treat tokens as opaque and ignore claims they do not know.
 
 Tokens are signed with the secret in the `JWT_SECRET` environment variable. **Never** log, return or commit this value.
 
@@ -619,9 +626,13 @@ Base path: **`/api/v1/auth`**.
 
 **Errors.** `401` unknown, expired, revoked or already-rotated token. Rotation is mandatory: the presented token is revoked and replaced. If a revoked/rotated token is presented again, the whole token family for that user must be revoked (reuse detection).
 
-### 6.6 `POST /auth/logout` — NOT IMPLEMENTED
+### 6.6 `POST /auth/logout`
 
 > **Implementation status: NOT IMPLEMENTED — and today there is no server-side logout at all.** Nothing in the backend revokes a JWT or a refresh token; the `RefreshToken` entity and `RefreshTokenRepository` are empty placeholders, and Spring Security is not configured yet. **Clients must not call this endpoint.**
+>
+> **(Update 2026-09-25:** this endpoint is now implemented exactly as the planned contract below —
+> `204`, idempotent, `allDevices` supported, bearer token required. Only refresh tokens are revoked;
+> an already-issued access token still expires on its own `exp`.)**
 
 **What “logout” means today:** the client deletes the stored access and refresh tokens. The access token remains valid until it expires — a known, accepted limitation until this endpoint is implemented.
 
@@ -808,7 +819,7 @@ Base path: **`/api/v1/users`**. Every route requires `Authorization: Bearer <JWT
 
 **Errors.** `401` current password wrong (deliberately distinct from validation — the client shows it like a failed login) · `422` new passwords differ or violate the §13 policy · `409` new password equal to the current one (contract).
 
-**Behavior.** All refresh tokens of the user except the one used for this call are revoked (contract), so other devices are signed out.
+**Behavior.** All refresh tokens of the user except the one used for this call are revoked (contract), so other devices are signed out. The caller's session is identified by the `sid` claim of the bearer token (§3); a token minted without that claim falls back to revoking every session, as §6.9 does.
 
 ### 7.5 `GET /users/me/notification-settings`
 
@@ -1609,26 +1620,30 @@ Additional rules:
 
 ### 21.1 Implementation status
 
+> **Updated 2026-09-25:** flipped after inspecting the implemented backend — see §22 for the
+> evidence. The per-section banners and §21.2 below still describe the 2026-09-23 baseline of
+> commit `fadf5e2`.
+
 | Feature | API Documentation | Backend Implementation | Status |
 |---|---|---|---|
-| Registration | Yes (§6.1) | No | **Gap** |
-| Login | Yes (§6.4) | No | **Gap** |
-| JWT | Yes (§3, §6.4) | No | **Gap** |
-| Tax Types | Yes (§8) | No | **Gap** |
-| Calculator | Yes (§9) | No | **Gap** |
-| Calculation History | Yes (§10) | No | **Gap** |
-| Profile | Yes (§7) | No | **Gap** |
-| Notifications | Yes (§11) | No | **Gap** |
-| Refresh tokens | Yes (§6.5) | No | **Gap** |
-| Logout / token revocation | Yes (§6.6) | No | **Gap** |
-| Password reset (OTP) | Yes (§6.7–6.9) | No | **Gap** |
-| OTP e-mail delivery | Yes (§6) | No | **Gap** |
-| Address management | Yes (§7.3) | No | **Gap** |
-| Error envelope / handler | Yes (§5) | No | **Gap** |
-| Pagination | Yes (§15) | No | **Gap** |
-| Database schema (Flyway V1–V4) | Yes (§21.2) | No — files are 0 bytes | **Gap** |
-| Tax data seeding | Yes (§8.6) | No | **Gap** |
-| Security configuration (route rules, CORS, CSRF) | Yes (§16) | No | **Gap** |
+| Registration | Yes (§6.1) | Yes | **Complete** |
+| Login | Yes (§6.4) | Yes | **Complete** |
+| JWT | Yes (§3, §6.4) | Yes | **Complete** |
+| Tax Types | Yes (§8) | Yes | **Complete** |
+| Calculator | Yes (§9) | Yes | **Complete** |
+| Calculation History | Yes (§10) | Yes | **Complete** |
+| Profile | Yes (§7) | Yes | **Complete** |
+| Notifications | Yes (§11) | Yes | **Complete** |
+| Refresh tokens | Yes (§6.5) | Yes | **Complete** |
+| Logout / token revocation | Yes (§6.6) | Yes (planned contract) | **Complete** |
+| Password reset (OTP) | Yes (§6.7–6.9) | Yes | **Complete** |
+| OTP e-mail delivery | Yes (§6) | Yes | **Complete** |
+| Address management | Yes (§7.3) | Yes | **Complete** |
+| Error envelope / handler | Yes (§5) | Yes | **Complete** |
+| Pagination | Yes (§15) | Yes | **Complete** |
+| Database schema (Flyway V1–V4) | Yes (§21.2) | Yes | **Complete** |
+| Tax data seeding | Yes (§8.6) | Yes | **Complete** |
+| Security configuration (route rules, CORS, CSRF) | Yes (§16) | Yes | **Complete** |
 | Role-based authorization | Documented as absent | No | N/A |
 | Account deletion | Deliberately absent (§7.7) | No | N/A |
 
@@ -1689,3 +1704,37 @@ Additional rules:
 ---
 
 **End of `API.md`.** Every endpoint in this document is the contract to implement; §21 is the record of what still does not exist. When in doubt, trust the backend source over this file — and fix this file in the same commit (§20).
+
+---
+
+## 22. Implementation status update — 2026-09-25
+
+> This section supersedes the per-endpoint "Implementation status: NOT IMPLEMENTED" banners above,
+> which describe the 2026-09-23 baseline at backend commit `fadf5e2`.
+
+**All 24 routes of the §12 matrix are implemented** (including `POST /auth/logout`, built to the
+§6.6 planned contract), and §21.1 has been flipped to *Complete* after code inspection.
+
+| Slice | Routes | Evidence |
+|---|---|---|
+| Auth | §6.1–6.5, §6.7–6.9 | `auth/controller/AuthController.java`, `AuthService`, `OtpService`, `PasswordResetService` |
+| Logout | §6.6 | `AuthController#logout` + `AuthService#logout` (`allDevices`, idempotent `204`) |
+| Profile, address, password, notifications | §7, §11 | `user/controller/UserController.java`, `UserService`, `UserResponse` |
+| Tax catalogue | §8 | `tax/controller/TaxController.java`, `TaxService`, `TaxResponse`/`TaxBracketResponse`/`TaxExampleResponse` |
+| Calculator and history | §9, §10 | `calculation/…`; the canonical ₱600,000 → ₱62,500.00 case is unit-tested |
+| Smoke tests | §17 | `http/auth.http`, `http/calculation.http`, `http/tax.http`, `http/user.http` are filled with the flows |
+
+**§7.4 revocation scope — resolved 2026-09-25.** Access tokens now carry a `sid` claim (the
+refresh-token rotation family of the session that obtained them, §3), so `PUT /users/me/password`
+revokes every **other** session and keeps the caller signed in, exactly as the contract asks.
+Clients are unaffected (tokens are opaque); a token minted without the claim falls back to revoking
+every session, as §6.9 does.
+
+**Not part of this contract (unchanged).** §7.7 account deletion, the role model, the client-side
+gaps C1–C8 of §21.4, and the `taxratesystem_mobile` mirror re-sync.
+
+**Verification at 2026-09-25.** `compileJava`/`compileTestJava` clean; 34 database-free unit tests
+pass (`CalculationServiceTest` 7, `TaxServiceTest` 5, `UserServiceTest` 12,
+`AuthServiceLogoutTest` 5, `JwtServiceTest` 5 — the last covers the `sid` claim round-trip,
+tampering, foreign-secret and expiry rejection). A live boot needs real `DB_USERNAME`/`DB_PASSWORD`
+values and a ≥ 32-character `JWT_SECRET` — the committed `.env` holds placeholders only (§21.3).

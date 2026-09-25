@@ -1,0 +1,60 @@
+### TaxRateSystem - profile + notification smoke tests (API.md §7, §11, §17 Flow 6)
+### Requires a bearer token: run http/auth.http first.
+
+@baseUrl = http://localhost:8080/api/v1
+
+### §7.1 - the caller's full profile
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### §7.2 - partial update: absent fields stay, explicit nulls clear phone/gender/dateOfBirth
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "firstName": "Juan Miguel", "phoneNumber": "09179876543" }
+
+### §7.2 - clearing the optional fields (409 phone conflict; 422 invalid values)
+PUT {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "phoneNumber": null, "gender": null, "dateOfBirth": null }
+
+### §7.3 - create or replace the single address (full replace, not a patch)
+PUT {{baseUrl}}/users/me/address
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "street": "123 Rizal Avenue",
+  "barangay": "Barangay 1",
+  "city": "Manila",
+  "province": "Metro Manila",
+  "postalCode": "1000"
+}
+
+### §7.4 - change the password (200; every other session is signed out)
+PUT {{baseUrl}}/users/me/password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "SecurePassword123",
+  "newPassword": "SecurePassword456",
+  "confirmPassword": "SecurePassword456"
+}
+
+### §7.5/§11.1 - the three notification switches
+GET {{baseUrl}}/users/me/notification-settings
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### §7.6/§11.2 - persist the full switch set (all three required)
+PUT {{baseUrl}}/users/me/notification-settings
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "taxUpdates": true, "calculationReminders": true, "generalNotifications": false }
+

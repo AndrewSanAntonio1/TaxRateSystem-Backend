@@ -25,6 +25,15 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Inte
             + "where token.user.id = :userId and token.revokedAt is null")
     int revokeAllForUser(@Param("userId") Integer userId, @Param("when") Instant when);
 
+    /** Revokes every live token of a user except the caller's rotation family (§7.4 password change). */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update RefreshToken token set token.revokedAt = :when "
+            + "where token.user.id = :userId and token.familyId <> :keepFamilyId "
+            + "and token.revokedAt is null")
+    int revokeAllForUserExceptFamily(@Param("userId") Integer userId,
+                                     @Param("keepFamilyId") String keepFamilyId,
+                                     @Param("when") Instant when);
+
     /** Revokes every live token of a user except one - the session performing the change. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update RefreshToken token set token.revokedAt = :when "

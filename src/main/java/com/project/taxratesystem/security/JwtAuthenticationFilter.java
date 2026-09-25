@@ -52,6 +52,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private void authenticate(JwtService.JwtPayload payload, HttpServletRequest request) {
         try {
             UserDetails principal = userDetailsService.loadUserByUsername(payload.subject());
+            if (principal instanceof AuthenticatedUser authenticated) {
+                // The bearer token names the session (refresh rotation family) that obtained it;
+                // §7.4 uses it to keep the caller signed in through a password change.
+                principal = authenticated.withSessionId(payload.sessionId());
+            }
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

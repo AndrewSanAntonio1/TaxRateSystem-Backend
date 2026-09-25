@@ -1,0 +1,25 @@
+### TaxRateSystem - tax catalogue smoke tests (API.md §8, §17 Flow 3)
+### Public routes: no token required.
+
+@baseUrl = http://localhost:8080/api/v1
+
+### §8.1 - all ten tax types (summary form; exactly ten, never paginated)
+GET {{baseUrl}}/taxes
+Accept: application/json
+
+### §8.2 - personal income tax: six brackets + the canonical ₱600,000 -> ₱62,500 example
+GET {{baseUrl}}/taxes/personal_income_tax
+Accept: application/json
+
+### §8.3 - bracket table only (VAT)
+GET {{baseUrl}}/taxes/vat/brackets
+Accept: application/json
+
+### §8.4 - worked example(s) only
+GET {{baseUrl}}/taxes/vat/examples
+Accept: application/json
+
+### Unknown code -> 404 with message "No tax type with code 'gst'."
+GET {{baseUrl}}/taxes/gst
+Accept: application/json
+

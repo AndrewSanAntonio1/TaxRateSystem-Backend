@@ -22,8 +22,9 @@ import java.util.Optional;
  * Issues and verifies the HS256 JWT access tokens of API.md §3.
  *
  * <p>Claim set (the contract): {@code sub} = user e-mail, {@code uid} = numeric user id,
- * {@code iat}/{@code exp} = epoch seconds, plus {@code typ} = {@link TokenType#ACCESS} so a token
- * of any other kind can never be replayed as a bearer token.
+ * {@code iat}/{@code exp} = epoch seconds, {@code sid} = the refresh-token rotation family of the
+ * session that obtained the token (nullable, §7.4), plus {@code typ} = {@link TokenType#ACCESS} so
+ * a token of any other kind can never be replayed as a bearer token.
  *
  * <p>Implemented on JDK crypto (HmacSHA256 + Base64url) instead of adding a JWT dependency: the
  * dependency tree stays exactly as the scaffold declares it. The checks that make this safe are
@@ -65,8 +66,13 @@ public class JwtService {
         return accessTokenTtlMillis / 1000;
     }
 
-    /** Signs an access token for {@code user}; the raw token must never be logged. */
-    public String generateAccessToken(User user) {
+    /**
+     * Signs an access token for {@code user}; the raw token must never be logged.
+     *
+     * @param sessionId the refresh-token rotation family of the session that obtained the token, or
+     *                  {@code null} when the caller has no session to keep (API.md §3, §7.4)
+     */
+    public String generateAccessToken(User user, String sessionId) {
         Instant issuedAt = Instant.now();
         Instant expiresAt = issuedAt.plusMillis(accessTokenTtlMillis);
 
@@ -75,6 +81,9 @@ public class JwtService {
         claims.put("sub", user.getEmail());
         claims.put("uid", user.getId());
         claims.put("typ", TokenType.ACCESS.name());
+        if (sessionId != null) {
+            claims.put("sid", sessionId);
+        }
         claims.put("iat", issuedAt.getEpochSecond());
         claims.put("exp", expiresAt.getEpochSecond());
 
@@ -119,6 +128,7 @@ public class JwtService {
             }
             String subject = asString(claims.get("sub"));
             Integer userId = asInteger(claims.get("uid"));
+            String sessionId = asString(claims.get("sid"));
             Long expiresAtEpoch = asLong(claims.get("exp"));
             Long issuedAtEpoch = asLong(claims.get("iat"));
             if (subject == null || subject.isBlank() || userId == null || expiresAtEpoch == null) {
@@ -129,15 +139,16 @@ public class JwtService {
                 return Optional.empty();
             }
             Instant issuedAt = issuedAtEpoch != null ? Instant.ofEpochSecond(issuedAtEpoch) : null;
-            return Optional.of(new JwtPayload(userId, subject, TokenType.ACCESS, issuedAt, expiresAt));
+            return Optional.of(new JwtPayload(userId, subject, sessionId, TokenType.ACCESS, issuedAt,
+                    expiresAt));
         } catch (IllegalArgumentException | JacksonException | GeneralSecurityException ex) {
             return Optional.empty();
         }
     }
 
     /** The verified content of an access token. */
-    public record JwtPayload(Integer userId, String subject, TokenType type, Instant issuedAt,
-                             Instant expiresAt) {
+    public record JwtPayload(Integer userId, String subject, String sessionId, TokenType type,
+                             Instant issuedAt, Instant expiresAt) {
     }
 
     @SuppressWarnings("unchecked")

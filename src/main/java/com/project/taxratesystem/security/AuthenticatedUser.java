@@ -15,11 +15,22 @@ import java.util.List;
  * with no authorities, and access is scoped by ownership, not by role. Only the fields needed to
  * authenticate and authorise are exposed - never the whole entity.
  */
-public record AuthenticatedUser(Integer id, String email, String passwordHash, UserStatus status)
+public record AuthenticatedUser(Integer id, String email, String passwordHash, UserStatus status,
+                                String sessionId)
         implements UserDetails {
 
     public static AuthenticatedUser from(User user) {
-        return new AuthenticatedUser(user.getId(), user.getEmail(), user.getPasswordHash(), user.getStatus());
+        return new AuthenticatedUser(user.getId(), user.getEmail(), user.getPasswordHash(),
+                user.getStatus(), null);
+    }
+
+    /**
+     * Returns a copy that carries the session (refresh rotation family) of the presented bearer
+     * token - the {@code sid} claim of API.md §3. {@code PUT /users/me/password} (§7.4) uses it to
+     * tell the caller's session apart from every other one.
+     */
+    public AuthenticatedUser withSessionId(String sessionId) {
+        return new AuthenticatedUser(id, email, passwordHash, status, sessionId);
     }
 
     @Override

@@ -1,0 +1,47 @@
+### TaxRateSystem - calculator + history smoke tests (API.md §9, §10, §17 Flows 4-5)
+### Requires a bearer token: run http/auth.http first (or paste one into @accessToken).
+
+@baseUrl = http://localhost:8080/api/v1
+@accessToken = {{accessToken}}
+
+### §9.1 - canonical case: ₱600,000 of personal income -> ₱62,500.00 (201, captures the id)
+POST {{baseUrl}}/calculations
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "taxType": "personal_income_tax", "taxableIncome": 600000 }
+
+> {%
+    client.global.set("calculationId", response.body.id);
+%}
+
+### §9.1 - unknown code -> 422 { "fields": { "taxType": "unknown tax type code" } }
+POST {{baseUrl}}/calculations
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "taxType": "gst", "taxableIncome": 1000 }
+
+### §10.1 - history, newest first, paged; optionally filtered by taxType
+GET {{baseUrl}}/calculations/history?page=0&size=20&sort=createdAt,desc
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### §10.1 - filter by tax type (an unknown value returns an empty page, not 404)
+GET {{baseUrl}}/calculations/history?page=0&size=20&sort=createdAt,desc&taxType=personal_income_tax
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### §10.2 - one owned calculation with its full breakdown (another user's id -> 404)
+GET {{baseUrl}}/calculations/{{calculationId}}
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### §10.3 - delete one history entry (204, idempotent)
+DELETE {{baseUrl}}/calculations/{{calculationId}}
+Authorization: Bearer {{accessToken}}
+
+### §10.4 - clear the caller's whole history (204)
+DELETE {{baseUrl}}/calculations/history
+Authorization: Bearer {{accessToken}}
+
